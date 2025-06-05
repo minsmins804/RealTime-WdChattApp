@@ -1,11 +1,11 @@
 import express from "express";
-import upload from "../middleware/upload";
+import upload from "../middleware/upload.js";
 import { login, logout, signup, checkAuth, updateProfile } from "../controllers/auth.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-router.post("/signup", signup);
+router.post("/signup", upload.single("profilePic"), signup);
 
 router.post("/login", login);
 
