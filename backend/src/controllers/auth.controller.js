@@ -15,18 +15,27 @@ export const signup = async (req, res) => {
             return res.status(400).json({message: "Mật khẩu phải ít nhất 6 kí tự"});    
         }
 
+        if (req.file) {
+            const base64String = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+            const uploadResponse = await cloudinary.uploader.upload(base64String);
+            profilePicUrl = uploadResponse.secure_url;
+        }
+
+        const salt = await bcrypt.genSalt(10)
+        const hashedPassword = await bcrypt.hash(password, salt)
+
         const user = await User.findOne({email})
 
         if (user) return res.status(400).json({message: "Email đã tồn tại"});
 
-        const salt = await bcrypt.genSalt(10)
-        const hashedPassword = await bcrypt.hash(password, salt)
 
         const newUser = new User({
             fullName,
             email,
             password: hashedPassword,
+            profilePic: profilePicUrl,
         })
+        await newUser.save();
 
         if (newUser) {
             //generate jwt token
@@ -38,6 +47,7 @@ export const signup = async (req, res) => {
                 fullName: newUser.fullName,
                 email: newUser.email,
                 profilePic: newUser.profilePic,
+                createdAt: newUser.createdAt,
             });
         }
         else {
@@ -72,6 +82,7 @@ export const login = async (req, res) => {
             fullName: user.fullName,
             email: user.email,
             profilePic: user.profilePic,
+            createdAt: user.createdAt,
         });
 
     } catch (error) {

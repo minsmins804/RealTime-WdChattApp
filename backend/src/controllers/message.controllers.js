@@ -1,10 +1,10 @@
-import User from "../models/user.model.js";
+import user from "../models/user.model.js";
 import Message from "../models/message.model.js"
 
 export const getUserForSidebar = async (req, res) => {
     try {
-        const loggedInUserId = req.User._id;
-        const filteredUsers = await User.find({
+        const loggedInUserId = req.user._id;
+        const filteredUsers = await user.find({
             _id: {
                 $ne: loggedInUserId
             }
@@ -58,23 +58,34 @@ export const sendMessage = async (req, res) => {
         } = req.params;
         const senderId = req.user._id;
 
-        let imageUrl;
-        if (image) {
-            // Upload base64 image to cloudinary
-            const uploadResponse = await cloudinary.uploader.upload(image);
-            imageUrl = uploadResponse.secure_url;
+        let uploadedImageUrls = [];
+        if (images && Array.isArray(images)) {
+            for (const base64 of images) {
+                const uploadRes = await cloudinary.uploader.upload(base64, {
+                    folder: "chat_images",
+                });
+                uploadedImageUrls.push(uploadRes.secure_url);
+            }
         }
 
         const newMessage = new Message({
             senderId,
             receiverId,
             text,
-            image: imageUrl,
+            image: uploadedImageUrls[0] || null, // Use the first image as the main image if available
+            images: uploadedImageUrls.length > 0 ? uploadedImageUrls : [],
         });
 
         await newMessage.save();
 
-        //realtime 
+        // Realtime 
+        const io = req.app.get("io");
+        const onlineUsers = req.app.get("onlineUsers");
+        const receiverSocketId = onlineUsers.get(receiverId);
+
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit("newMessage", newMessage);
+        }
 
         res.status(201).json(newMessage);
     } catch (error) {
